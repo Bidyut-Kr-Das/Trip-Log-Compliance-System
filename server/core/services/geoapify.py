@@ -76,3 +76,84 @@ def autocomplete_address(params):
         )
 
     return results
+
+
+def route_trip(params):
+    api_key = getattr(settings, 'GEOAPIFY_API_KEY', '')
+    if not api_key:
+        raise GeoapifyConfigurationError('Geoapify API key is not configured.')
+
+    waypoints = [
+        params['current_location'],
+        params['pickup_location'],
+        params['dropoff_location'],
+    ]
+    waypoint_query = '|'.join(f"{point['lat']},{point['lon']}" for point in waypoints)
+
+    query_params = {
+        'waypoints': waypoint_query,
+        'mode': params.get('mode', 'drive'),
+        'apiKey': api_key,
+        'format': 'geojson',
+    }
+
+    details = params.get('details')
+    if details:
+        query_params['details'] = details
+
+    timeout = getattr(settings, 'GEOAPIFY_TIMEOUT', 5)
+    url = f"https://api.geoapify.com/v1/routing?{urlencode(query_params)}"
+    request = Request(url, headers={'Accept': 'application/json'})
+
+    try:
+        with urlopen(request, timeout=timeout) as response:
+            payload = json.loads(response.read().decode('utf-8'))
+    except HTTPError as exc:
+        raise GeoapifyUpstreamError('Geoapify routing request failed.', status_code=502) from exc
+    except (URLError, TimeoutError, json.JSONDecodeError) as exc:
+        raise GeoapifyUpstreamError('Geoapify routing request could not be completed.', status_code=504) from exc
+
+    # print(f"Geoapify routing payload: {payload}"    )
+
+    features = payload.get('features', []) if isinstance(payload, dict) else []
+    if not features:
+        message = payload.get('message', 'Geoapify did not return any routing results.') if isinstance(payload, dict) else 'Geoapify did not return any routing results.'
+        raise GeoapifyUpstreamError(message, status_code=502)
+
+    feature = features[0] if isinstance(features[0], dict) else {}
+    properties = feature.get('properties', {}) if isinstance(feature, dict) else {}
+    geometry = feature.get('geometry', {}) if isinstance(feature, dict) else {}
+
+    legs = properties.get('legs', []) if isinstance(properties, dict) else []
+
+    normalized_waypoints = []
+    for point in waypoints:
+        normalized_waypoints.append(
+            {
+                'label': point.get('label', ''),
+                'lat': point['lat'],
+                'lon': point['lon'],
+            }
+        )
+
+    normalized_legs = []
+    for leg in legs:
+        if not isinstance(leg, dict):
+            continue
+        normalized_legs.append(
+            {
+                'distance': leg.get('distance', 0),
+                'duration': leg.get('duration', leg.get('time', 0)),
+                'time': leg.get('time', leg.get('duration', 0)),
+                'steps': leg.get('steps', []),
+            }
+        )
+
+    return {
+        'mode': properties.get('mode', params.get('mode', 'drive')),
+        'distance_meters': properties.get('distance', 0),
+        'duration_seconds': properties.get('time', properties.get('duration', 0)),
+        'waypoints': normalized_waypoints,
+        'legs': normalized_legs,
+        'geometry': geometry,
+    }

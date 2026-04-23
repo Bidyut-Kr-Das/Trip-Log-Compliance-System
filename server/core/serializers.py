@@ -33,3 +33,48 @@ class AddressSuggestionSerializer(serializers.Serializer):
 
 class AddressAutocompleteResponseSerializer(serializers.Serializer):
     results = AddressSuggestionSerializer(many=True)
+
+
+class RoutePointSerializer(serializers.Serializer):
+    label = serializers.CharField(required=False, allow_blank=True, max_length=200)
+    lat = serializers.FloatField(min_value=-90, max_value=90)
+    lon = serializers.FloatField(min_value=-180, max_value=180)
+
+
+class TripRoutingRequestSerializer(serializers.Serializer):
+    current_location = RoutePointSerializer()
+    pickup_location = RoutePointSerializer()
+    dropoff_location = RoutePointSerializer()
+    mode = serializers.ChoiceField(required=False, choices=('drive',), default='drive')
+    details = serializers.CharField(required=False, allow_blank=True, max_length=50)
+
+
+class RouteLegStepSerializer(serializers.Serializer):
+    instruction = serializers.JSONField(required=False)
+    distance = serializers.FloatField(required=False)
+    duration = serializers.FloatField(required=False)
+    time = serializers.FloatField(required=False)
+    name = serializers.CharField(required=False, allow_blank=True)
+    road_class = serializers.CharField(required=False, allow_blank=True)
+    surface = serializers.CharField(required=False, allow_blank=True)
+
+
+class RouteLegSerializer(serializers.Serializer):
+    distance = serializers.FloatField(required=False)
+    duration = serializers.FloatField(required=False)
+    time = serializers.FloatField(required=False)
+    steps = RouteLegStepSerializer(many=True, required=False)
+
+
+class RouteGeometrySerializer(serializers.Serializer):
+    type = serializers.CharField()
+    coordinates = serializers.JSONField()
+
+
+class TripRoutingResponseSerializer(serializers.Serializer):
+    mode = serializers.CharField()
+    distance_meters = serializers.FloatField()
+    duration_seconds = serializers.FloatField()
+    waypoints = RoutePointSerializer(many=True)
+    legs = RouteLegSerializer(many=True)
+    geometry = RouteGeometrySerializer()

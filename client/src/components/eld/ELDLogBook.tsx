@@ -138,7 +138,7 @@ function GridRow({
                 return (
                   <div
                     key={t}
-                    onClick={() => onCellToggle(rowIndex, cellIdx)}
+                    // onClick={() => onCellToggle(rowIndex, cellIdx)} 
                     style={{
                       flex: 1,
                       height: "100%",
@@ -490,15 +490,14 @@ export default function DriversLog() {
             {Array.from({ length: 24 }).map((_, h) => (
               <div
                 key={h}
-                className="flex-1 flex items-center justify-center"
+                className="flex-1 flex items-center justify-end"
                 style={{
-                  borderRight: h === 23 ? "none" : "1px solid #777",
                   color: "white",
                   fontSize: "11px",
-                  padding: "2px 0",
+                  padding: "2px 4px 2px 0",
                   fontFamily: "'Courier New', monospace",
                   fontWeight: "bold",
-                  textAlign: "center",
+                  textAlign: "right",
                   lineHeight: "1",
                 }}
               >

@@ -273,3 +273,32 @@ export function getLastEventStatus(events: TimelineEvent[]): ELDDutyStatus {
   const sorted = [...events].sort((a, b) => parseTimeToQuarter(a.time) - parseTimeToQuarter(b.time))
   return sorted[sorted.length - 1].status
 }
+
+/**
+ * Apply continuity injection to all days in a timeline.
+ * Returns a new array of days with synthetic 00:00 events injected where needed.
+ */
+export function applyGlobalContinuity(timelineDays: any[]): any[] {
+  if (!timelineDays || timelineDays.length === 0) {
+    return []
+  }
+
+  return timelineDays.map((day, dayIndex) => {
+    const isFirstDay = dayIndex === 0
+    let startStatus: ELDDutyStatus
+
+    if (isFirstDay) {
+      startStatus = 'off_duty'
+    } else {
+      const previousDay = timelineDays[dayIndex - 1]
+      startStatus = getLastEventStatus(previousDay.events || [])
+    }
+
+    const eventsWithContinuity = injectContinuityEvent(day.events || [], startStatus)
+
+    return {
+      ...day,
+      events: eventsWithContinuity,
+    }
+  })
+}

@@ -1,9 +1,15 @@
 import { useMemo, useState, type ChangeEvent } from "react";
 import { EXAMPLE_TIMELINE_EVENTS } from "../../types/eldTimeline";
+import type { TimelineDay } from "../../types/route";
 import {
   buildTimelinePlotPaths,
+  buildDrivingRemarkMarkers,
   normalizeEventsToSegments,
 } from "../../utils/eldTimeline";
+
+type Props = {
+  timelineDay?: TimelineDay | null
+}
 
 type FormData = {
   month: string;
@@ -217,7 +223,7 @@ function GridRow({
   );
 }
 
-export default function DriversLog() {
+export default function DriversLog({ timelineDay }: Props) {
   const [formData, setFormData] = useState<FormData>({
     month: "",
     day: "",
@@ -241,9 +247,18 @@ export default function DriversLog() {
     Array.from({ length: 4 }, () => Array(96).fill(false)),
   );
 
+  // Use timeline data from props if available, otherwise use example
+  const timelineEvents = useMemo(() => {
+    if (timelineDay?.events && timelineDay.events.length > 0) {
+      return timelineDay.events;
+    }
+    // Fallback to example events
+    return EXAMPLE_TIMELINE_EVENTS;
+  }, [timelineDay]);
+
   const timelineSegments = useMemo(
-    () => normalizeEventsToSegments(EXAMPLE_TIMELINE_EVENTS),
-    [],
+    () => normalizeEventsToSegments(timelineEvents),
+    [timelineEvents],
   );
 
   const plotPaths = useMemo(
@@ -254,6 +269,11 @@ export default function DriversLog() {
           PLOT_STATUS_ORDER.indexOf(status) * ROW_HEIGHT + ROW_HEIGHT / 2,
         (quarter) => quarter,
       ),
+    [timelineSegments],
+  );
+
+  const remarkMarkers = useMemo(
+    () => buildDrivingRemarkMarkers(timelineSegments),
     [timelineSegments],
   );
 
@@ -281,7 +301,7 @@ export default function DriversLog() {
         width: "100%",
         maxWidth: "none",
         boxSizing: "border-box",
-        border: "2px solid black",
+        // border: "2px solid black", 
         padding: "16px 20px",
         fontSize: "12px",
       }}
@@ -583,6 +603,73 @@ export default function DriversLog() {
       <div className="mt-3">
         <div className="mb-1 text-lg font-bold">Remarks</div>
         <div className="border-b border-black mb-1" style={{ height: "1px" }} />
+        {/* <div className="relative mb-2 h-28 overflow-hidden border-b border-black">
+          <svg
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0"
+            viewBox="0 0 96 28"
+            preserveAspectRatio="none"
+          >
+            {remarkMarkers.map((marker, index) => {
+              const startX = marker.startQuarter
+              const endX = Math.max(marker.endQuarter, marker.startQuarter + 1)
+              const topY = marker.kind === 'boxed' ? 8 : 14
+              const bottomY = 24
+              const boxHeight = bottomY - topY
+              const title = marker.city ?? 'Status change'
+              const note = marker.remark ?? ''
+
+              return (
+                <g key={`${marker.kind}-${marker.startQuarter}-${marker.endQuarter}-${index}`}>
+                  {marker.kind === 'boxed' ? (
+                    <>
+                      <path
+                        d={`M ${startX} ${bottomY} L ${startX} ${topY} L ${endX} ${topY} L ${endX} ${bottomY}`}
+                        fill="none"
+                        stroke="#000"
+                        strokeWidth="1.3"
+                        vectorEffect="non-scaling-stroke"
+                        strokeLinecap="butt"
+                        strokeLinejoin="miter"
+                      />
+                      <path
+                        d={`M ${startX} ${bottomY} L ${startX - 5} ${bottomY - 5}`}
+                        fill="none"
+                        stroke="#000"
+                        strokeWidth="1.3"
+                        vectorEffect="non-scaling-stroke"
+                        strokeLinecap="butt"
+                        strokeLinejoin="miter"
+                      />
+                    </>
+                  ) : (
+                    <path
+                      d={`M ${startX} ${bottomY} L ${startX - 5} ${bottomY - 5}`}
+                      fill="none"
+                      stroke="#000"
+                      strokeWidth="1.3"
+                      vectorEffect="non-scaling-stroke"
+                      strokeLinecap="butt"
+                      strokeLinejoin="miter"
+                    />
+                  )}
+                  <text
+                    x={startX - 2}
+                    y={marker.kind === 'boxed' ? topY + boxHeight / 2 : bottomY - 7}
+                    fill="#000"
+                    fontFamily="'Courier New', monospace"
+                    fontSize="3.5"
+                    fontWeight="700"
+                    transform={`rotate(-45 ${startX - 2} ${marker.kind === 'boxed' ? topY + boxHeight / 2 : bottomY - 7})`}
+                  >
+                    {title}
+                    {note ? `  ${note}` : ''}
+                  </text>
+                </g>
+              )
+            })}
+          </svg>
+        </div> */}
         <textarea
           className="w-full resize-none border-b border-black bg-transparent text-base outline-none"
           rows={3}

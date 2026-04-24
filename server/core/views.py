@@ -7,6 +7,8 @@ from core.serializers import (
     AddressAutocompleteResponseSerializer,
     TripRoutingRequestSerializer,
     TripRoutingResponseSerializer,
+    TripTimelineRequestSerializer,
+    TripTimelineResponseSerializer,
 )
 from core.services.geoapify import (
     GeoapifyConfigurationError,
@@ -14,6 +16,7 @@ from core.services.geoapify import (
     autocomplete_address,
     route_trip,
 )
+from core.services.eld_timeline import TimelineGenerator
 
 
 class GeoapifyAutocompleteView(APIView):
@@ -48,4 +51,33 @@ class GeoapifyTripRoutingView(APIView):
             return Response({'detail': str(exc)}, status=exc.status_code)
 
         response = TripRoutingResponseSerializer(result)
+        return Response(response.data, status=status.HTTP_200_OK)
+
+
+class GeoapifyTripTimelineView(APIView):
+    def post(self, request, format=None):
+        serializer = TripTimelineRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            # First, get the route from Geoapify
+            route_result = route_trip(serializer.validated_data)
+        except GeoapifyConfigurationError as exc:
+            return Response({'detail': str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except GeoapifyUpstreamError as exc:
+            return Response({'detail': str(exc)}, status=exc.status_code)
+
+        # Then, generate timeline from route
+        try:
+            timezone = serializer.validated_data.get('timezone', 'UTC')
+            generator = TimelineGenerator(timezone=timezone)
+            timeline_days = generator.generate_timeline(route_result)
+            response_data = {'timeline_days': timeline_days}
+        except Exception as exc:
+            return Response(
+                {'detail': f'Timeline generation failed: {str(exc)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+        response = TripTimelineResponseSerializer(response_data)
         return Response(response.data, status=status.HTTP_200_OK)

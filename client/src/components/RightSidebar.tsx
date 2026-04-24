@@ -2,11 +2,12 @@ import { type FormEvent, useState } from 'react'
 import AddressAutocompleteInput from './AddressAutocompleteInput'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { AddressSuggestion } from '../types/address'
-import type { RoutePoint, TripRouteResponse } from '../types/route'
-import { fetchTripRoute } from '../services/routing'
+import type { RoutePoint, TripRouteResponse, TripTimelineResponse } from '../types/route'
+import { fetchTripRoute, fetchTripTimeline } from '../services/routing'
 
 type Props = {
   onRouteComputed?: (route: TripRouteResponse) => void
+  onTimelineComputed?: (timeline: TripTimelineResponse) => void
 }
 
 function suggestionToPoint(suggestion: AddressSuggestion): RoutePoint {
@@ -17,7 +18,7 @@ function suggestionToPoint(suggestion: AddressSuggestion): RoutePoint {
   }
 }
 
-export default function RightSidebar({ onRouteComputed }: Props) {
+export default function RightSidebar({ onRouteComputed, onTimelineComputed }: Props) {
   const [isPanelCollapsed, setIsPanelCollapsed] = useState(false)
   const [currentLocation, setCurrentLocation] = useState('')
   const [pickupLocation, setPickupLocation] = useState('')
@@ -75,18 +76,46 @@ export default function RightSidebar({ onRouteComputed }: Props) {
     setSubmitSuccess('')
 
     try {
-      const route = await fetchTripRoute({
+      // Build shared payload for both APIs
+      const payload = {
         current_location: currentPoint,
         pickup_location: pickupPoint,
         dropoff_location: dropoffPoint,
-        mode: 'drive',
-      })
+        mode: 'drive' as const,
+      }
 
-      onRouteComputed?.(route)
-      resetForm()
-      setSubmitSuccess('Route calculated successfully.')
+      // Execute both API calls in parallel using Promise.allSettled
+      // so route rendering is not blocked if timeline generation fails
+      const [routeResult, timelineResult] = await Promise.allSettled([
+        fetchTripRoute(payload),
+        fetchTripTimeline({ ...payload, timezone: 'UTC' }),
+      ])
+
+      let hasError = false
+
+      // Handle route result (required)
+      if (routeResult.status === 'fulfilled') {
+        onRouteComputed?.(routeResult.value)
+      } else {
+        setSubmitError('Unable to calculate route right now. Please try again.')
+        hasError = true
+      }
+
+      // Handle timeline result (optional, warn if it fails)
+      if (timelineResult.status === 'fulfilled') {
+        onTimelineComputed?.(timelineResult.value)
+      } else if (!hasError) {
+        // Only show timeline error if route was successful
+        setSubmitError('Route calculated, but timeline generation failed. Try again.')
+        hasError = true
+      }
+
+      if (!hasError) {
+        resetForm()
+        setSubmitSuccess('Route and timeline generated successfully.')
+      }
     } catch {
-      setSubmitError('Unable to calculate route right now. Please try again.')
+      setSubmitError('An unexpected error occurred. Please try again.')
     } finally {
       setIsSubmitting(false)
     }

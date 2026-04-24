@@ -42,3 +42,29 @@ export type TripRouteResponse = {
   legs: RouteLeg[]
   geometry: RouteGeometry
 }
+
+export type TripTimelineRequest = {
+  current_location: RoutePoint
+  pickup_location: RoutePoint
+  dropoff_location: RoutePoint
+  mode?: 'drive'
+  timezone?: string
+}
+
+export type TimelineEvent = {
+  time: string
+  status: 'off_duty' | 'sleeper_berth' | 'driving' | 'on_duty_not_driving'
+  city?: string
+  remark?: string
+}
+
+export type TimelineDay = {
+  date: string
+  timezone: string
+  source: 'manual' | 'eld' | 'imported'
+  events: TimelineEvent[]
+}
+
+export type TripTimelineResponse = {
+  timeline_days: TimelineDay[]
+}

@@ -1,4 +1,9 @@
-import type { ELDDutyStatus, TimelineEvent, TimelineSegment } from '../types/eldTimeline'
+import type {
+  DrivingRemarkMarker,
+  ELDDutyStatus,
+  TimelineEvent,
+  TimelineSegment,
+} from '../types/eldTimeline'
 
 type PlotPoint = {
   x: number
@@ -25,14 +30,22 @@ export function parseTimeToQuarter(time: string): number {
   }
 
   const hour = Number(match[1])
-  const minute = Number(match[2])
+  let minute = Number(match[2])
 
   if (!Number.isInteger(hour) || hour < 0 || hour > 24) {
     throw new Error(`Invalid hour: ${time}`)
   }
 
+  // Tolerance: normalize non-quarter minutes to nearest quarter
   if (![0, 15, 30, 45].includes(minute)) {
-    throw new Error(`Invalid minute increment: ${time}`)
+    // Round to nearest quarter-hour
+    const normalized = Math.round(minute / 15) * 15
+    if (normalized === 60) {
+      // Overflow: round down instead
+      minute = 45
+    } else {
+      minute = normalized
+    }
   }
 
   if (hour === 24 && minute !== 0) {
@@ -79,11 +92,67 @@ export function normalizeEventsToSegments(events: TimelineEvent[]): TimelineSegm
       startQuarter,
       endQuarter,
       status: current.status,
+      city: current.city,
       remark: current.remark,
     })
   }
 
   return segments
+}
+
+function isDrivingStatus(status: ELDDutyStatus) {
+  return status === 'driving'
+}
+
+function isNonDrivingStatus(status: ELDDutyStatus) {
+  return status !== 'driving'
+}
+
+export function buildDrivingRemarkMarkers(segments: TimelineSegment[]): DrivingRemarkMarker[] {
+  if (segments.length === 0) {
+    return []
+  }
+
+  const markers: DrivingRemarkMarker[] = []
+
+  for (let index = 0; index < segments.length - 1; index += 1) {
+    const current = segments[index]
+    const next = segments[index + 1]
+
+    if (!isDrivingStatus(current.status) || !isNonDrivingStatus(next.status)) {
+      continue
+    }
+
+    let returnIndex = -1
+    for (let searchIndex = index + 2; searchIndex < segments.length; searchIndex += 1) {
+      if (segments[searchIndex].status === 'driving') {
+        returnIndex = searchIndex
+        break
+      }
+    }
+
+    if (returnIndex === -1) {
+      markers.push({
+        kind: 'line_only',
+        startQuarter: current.endQuarter,
+        endQuarter: next.startQuarter,
+        city: next.city,
+        remark: next.remark,
+      })
+      continue
+    }
+
+    const returnSegment = segments[returnIndex]
+    markers.push({
+      kind: 'boxed',
+      startQuarter: current.endQuarter,
+      endQuarter: returnSegment.startQuarter,
+      city: next.city,
+      remark: next.remark,
+    })
+  }
+
+  return markers
 }
 
 export function buildTimelinePathPoints(
@@ -162,4 +231,45 @@ export function createPlotGridWidth(totalQuarters: number, quarterWidth: number)
 
 export function createQuarterToTimeLabel(quarter: number): string {
   return formatQuarter(quarter)
+}
+
+/**
+ * Inject continuity event at 00:00 if not already present.
+ * - If day already has a real 00:00 event, use that (no synthetic injection).
+ * - Otherwise, inject synthetic 00:00 with provided startStatus.
+ * - Day 1 default start status: 'off_duty'
+ * - Day N (N > 1) default start status: derived from previous day's last event status
+ */
+export function injectContinuityEvent(
+  events: TimelineEvent[],
+  startStatus: ELDDutyStatus,
+): TimelineEvent[] {
+  if (events.length === 0) {
+    return [{ time: '00:00', status: startStatus }]
+  }
+
+  // Check if 00:00 event already exists
+  const hasStartEvent = events.some((e) => e.time === '00:00')
+
+  if (hasStartEvent) {
+    // Trust the real 00:00 event; return as-is
+    return events
+  }
+
+  // Inject synthetic 00:00 with startStatus
+  return [{ time: '00:00', status: startStatus }, ...events]
+}
+
+/**
+ * Extract the final status from a day's events.
+ * Used to derive the start status for the next day.
+ */
+export function getLastEventStatus(events: TimelineEvent[]): ELDDutyStatus {
+  if (events.length === 0) {
+    return 'off_duty'
+  }
+
+  // Sort by time to find the last event chronologically
+  const sorted = [...events].sort((a, b) => parseTimeToQuarter(a.time) - parseTimeToQuarter(b.time))
+  return sorted[sorted.length - 1].status
 }

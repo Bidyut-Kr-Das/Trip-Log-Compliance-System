@@ -78,3 +78,29 @@ class TripRoutingResponseSerializer(serializers.Serializer):
     waypoints = RoutePointSerializer(many=True)
     legs = RouteLegSerializer(many=True)
     geometry = RouteGeometrySerializer()
+
+
+class TripTimelineRequestSerializer(serializers.Serializer):
+    current_location = RoutePointSerializer()
+    pickup_location = RoutePointSerializer()
+    dropoff_location = RoutePointSerializer()
+    mode = serializers.ChoiceField(required=False, choices=('drive',), default='drive')
+    timezone = serializers.CharField(required=False, default='UTC', max_length=50)
+
+
+class TimelineEventSerializer(serializers.Serializer):
+    time = serializers.CharField()
+    status = serializers.ChoiceField(choices=('off_duty', 'sleeper_berth', 'driving', 'on_duty_not_driving'))
+    city = serializers.CharField(allow_blank=True, required=False)
+    remark = serializers.CharField(allow_blank=True, required=False)
+
+
+class TimelineDaySerializer(serializers.Serializer):
+    date = serializers.CharField()
+    timezone = serializers.CharField()
+    source = serializers.ChoiceField(choices=('manual', 'eld', 'imported'))
+    events = TimelineEventSerializer(many=True)
+
+
+class TripTimelineResponseSerializer(serializers.Serializer):
+    timeline_days = TimelineDaySerializer(many=True)

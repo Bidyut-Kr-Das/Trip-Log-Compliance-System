@@ -3,10 +3,11 @@ import LeftNavbar from '../components/LeftNavbar'
 import LogPanel from '../components/LogPanel'
 import MapPanel from '../components/MapPanel'
 import RightSidebar from '../components/RightSidebar'
-import type { TripRouteResponse } from '../types/route'
+import type { TripRouteResponse, TripTimelineResponse } from '../types/route'
 
 export default function DashboardPage() {
   const [routeData, setRouteData] = useState<TripRouteResponse | null>(null)
+  const [timelineData, setTimelineData] = useState<TripTimelineResponse | null>(null)
   const [activeView, setActiveView] = useState<'map' | 'log'>('map')
 
   return (
@@ -67,11 +68,11 @@ export default function DashboardPage() {
               activeView === 'log' ? 'opacity-100 translate-y-0' : 'pointer-events-none opacity-0 translate-y-2'
             }`}
           >
-            <LogPanel />
+            <LogPanel timelineData={timelineData} />
           </section>
         </div>
 
-        <RightSidebar onRouteComputed={setRouteData} />
+        <RightSidebar onRouteComputed={setRouteData} onTimelineComputed={setTimelineData} />
       </main>
     </div>
   )

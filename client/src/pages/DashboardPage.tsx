@@ -12,10 +12,10 @@ export default function DashboardPage() {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-slate-100">
-      <LeftNavbar />
+      {/* <LeftNavbar /> */}
 
       <main className="relative min-w-0 flex-1">
-        <div className="absolute left-1/2 top-5 z-[1300] -translate-x-1/2 rounded-full border border-slate-200 bg-white/90 p-1 shadow-2xl backdrop-blur-md">
+        <div className="absolute left-1/2 top-5 z-1300 -translate-x-1/2 rounded-full border border-slate-200 bg-white/90 p-1 shadow-2xl backdrop-blur-md">
           <div role="tablist" aria-label="Main sections" className="flex items-center gap-1">
             <button
               type="button"

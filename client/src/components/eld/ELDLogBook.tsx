@@ -1,6 +1,7 @@
-import { useMemo, useState, type ChangeEvent } from "react";
+import { useMemo, useState, type ChangeEvent, useEffect } from "react";
 import { EXAMPLE_TIMELINE_EVENTS } from "../../types/eldTimeline";
 import type { TimelineDay } from "../../types/route";
+import type { TimelineSegment } from "../../types/eldTimeline";
 import {
   buildTimelinePlotPaths,
   buildDrivingRemarkMarkers,
@@ -85,6 +86,24 @@ const PLOT_STATUS_ORDER: readonly PlotStatus[] = [
   "driving",
   "on_duty_not_driving",
 ];
+
+/**
+ * Calculate total hours per duty status from timeline segments.
+ * Returns array of [off_duty_hours, sleeper_berth_hours, driving_hours, on_duty_not_driving_hours]
+ */
+function calculateHoursByStatus(segments: TimelineSegment[]): number[] {
+  const hours = [0, 0, 0, 0]; // one per PLOT_STATUS_ORDER
+
+  segments.forEach((segment) => {
+    const statusIndex = PLOT_STATUS_ORDER.indexOf(segment.status);
+    if (statusIndex !== -1) {
+      const quarters = segment.endQuarter - segment.startQuarter;
+      hours[statusIndex] += quarters / 4; // convert quarters to hours
+    }
+  });
+
+  return hours;
+}
 
 type GridRowProps = {
   label: string;
@@ -247,6 +266,19 @@ export default function DriversLog({ timelineDay }: Props) {
     Array.from({ length: 4 }, () => Array(96).fill(false)),
   );
 
+  // Auto-fill date fields from timelineDay.date when day changes
+  useEffect(() => {
+    if (timelineDay?.date) {
+      const [year, month, day] = timelineDay.date.split('-');
+      setFormData((prev) => ({
+        ...prev,
+        month: month || '',
+        day: day || '',
+        year: year || '',
+      }));
+    }
+  }, [timelineDay?.date]);
+
   // Use timeline data from props if available, otherwise use example
   const timelineEvents = useMemo(() => {
     if (timelineDay?.events && timelineDay.events.length > 0) {
@@ -274,6 +306,12 @@ export default function DriversLog({ timelineDay }: Props) {
 
   const remarkMarkers = useMemo(
     () => buildDrivingRemarkMarkers(timelineSegments),
+    [timelineSegments],
+  );
+
+  // Calculate total hours per status from timeline segments
+  const hoursByStatus = useMemo(
+    () => calculateHoursByStatus(timelineSegments),
     [timelineSegments],
   );
 
@@ -551,8 +589,8 @@ export default function DriversLog({ timelineDay }: Props) {
         <div className="relative">
           <svg
             aria-hidden="true"
-            className="pointer-events-none absolute left-27.5 top-0"
-            width="calc(100% - 160px)"
+            className="pointer-events-none absolute top-0"
+            style={{ left: "110px", width: "calc(100% - 160px)" }}
             height={ROW_HEIGHT * 4}
             viewBox="0 0 96 176"
             preserveAspectRatio="none"
@@ -583,8 +621,7 @@ export default function DriversLog({ timelineDay }: Props) {
 
           {/* Duty rows */}
           {DUTY_STATUSES.map((status, idx) => {
-            const activeCount = grid[idx].filter(Boolean).length;
-            const totalHours = activeCount / 4;
+            const totalHours = hoursByStatus[idx] || 0;
             return (
               <GridRow
                 key={status.id}

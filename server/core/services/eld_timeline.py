@@ -11,10 +11,13 @@ Enforces FMCSA Hours of Service regulations:
 - Fuel stop at least once per 1000 miles
 """
 
+import logging
 from datetime import datetime, timedelta
 from typing import TypedDict, Literal
 import random
 import math
+
+logger = logging.getLogger(__name__)
 
 
 ELDDutyStatus = Literal['off_duty', 'sleeper_berth', 'driving', 'on_duty_not_driving']
@@ -101,7 +104,7 @@ class TimelineGenerator:
 
         # Split events by calendar day (00:00 to 24:00)
         timeline_days = self._split_events_by_day(events_absolute)
-        print(timeline_days)
+        logger.debug(f"Generated timeline with {len(timeline_days)} days")
 
         return timeline_days
 
@@ -229,7 +232,7 @@ class TimelineGenerator:
             # Check if we need qualifying rest (11-hour driving or 14-hour window)
             if (driving_minutes_since_rest >= self.DRIVING_CAP_MINUTES or
                 duty_minutes_since_start >= self.DUTY_WINDOW_MINUTES):
-                events.append((current_dt, 'off_duty', None, 'Qualifying rest (10 hours)'))
+                events.append((current_dt, 'sleeper_berth', None, 'Qualifying rest (10 hours)'))
                 current_dt += timedelta(minutes=self.QUALIFYING_REST_MINUTES)
                 driving_minutes_since_rest = 0
                 duty_minutes_since_start = 0

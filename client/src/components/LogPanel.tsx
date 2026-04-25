@@ -136,7 +136,16 @@ export default function LogPanel({ timelineData }: Props) {
       <div
         ref={exportContainerRef}
         id="pdf-export-container"
-        className="absolute -left-full -top-full flex flex-col bg-white"
+        className="fixed pointer-events-none"
+        style={{
+          left: 0,
+          top: 0,
+          opacity: 0,
+          display: "flex",
+          flexDirection: "column",
+          backgroundColor: "white",
+          zIndex: -9999,
+        }}
       >
         {allDaysWithContinuity.map((day, index) => (
           <div
@@ -145,8 +154,9 @@ export default function LogPanel({ timelineData }: Props) {
             style={{
               width: "1100px",
               height: "850px",
-              pageBreakAfter: "always",
               overflow: "hidden",
+              pageBreakAfter: "always",
+              flexShrink: 0,
             }}
           >
             <ELDLogBook timelineDay={day} />

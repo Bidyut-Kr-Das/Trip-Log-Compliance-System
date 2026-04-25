@@ -27,14 +27,19 @@ export async function generateELDPDF(containerSelector: string, filename: string
     const page = pages[i] as HTMLElement
 
     try {
+      // Allow layout to settle before capturing
+      await new Promise((resolve) => requestAnimationFrame(resolve))
+
       // Capture page to canvas
       const canvas = await html2canvas(page, {
         scale: 2,
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff',
-        windowHeight: page.scrollHeight,
-        windowWidth: page.scrollWidth,
+        scrollX: 0,
+        scrollY: 0,
+        width: page.offsetWidth,
+        height: page.offsetHeight,
       })
 
       // Convert canvas to image data
